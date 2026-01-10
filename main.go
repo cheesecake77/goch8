@@ -1,19 +1,46 @@
 package main
 
-import rl "github.com/gen2brain/raylib-go/raylib"
+import (
+	"fmt"
+	rl "github.com/gen2brain/raylib-go/raylib"
+)
 
 func main() {
-  rl.InitWindow(800, 450, "raylib [core] example - basic window")
-  defer rl.CloseWindow()
+	var vm *chip8
+	romLoaded := false
+	rl.InitWindow(512, 256, "Chip8")
+	defer rl.CloseWindow()
 
-  rl.SetTargetFPS(60)
+	rl.InitAudioDevice()
+	defer rl.CloseAudioDevice()
 
-  for !rl.WindowShouldClose() {
-    rl.BeginDrawing()
+	rl.SetTargetFPS(60)
 
-    rl.ClearBackground(rl.RayWhite)
-    rl.DrawText("Congrats! You created your first window!", 190, 200, 20, rl.LightGray)
+	for !rl.WindowShouldClose() {
+		if rl.IsFileDropped() {
+			list := rl.LoadDroppedFiles()
+			fmt.Println(list[0])
+			vm = newChip8Vm("test")
+			romLoaded = true
+		}
+		rl.BeginDrawing()
+		if !romLoaded {
+			rl.ClearBackground(rl.Black)
+			rl.DrawText("Drag&Drop ROM here!", 130, 120, 20, rl.RayWhite)
+		} else {
+			// основная работа
+			vm.cycle()
+			if vm.sound_timer > 0{
+				// beep
+			}
+		}
+		rl.EndDrawing()
+	}
+}
 
-    rl.EndDrawing()
-  }
+func newChip8Vm(romPath string) *chip8 {
+	vm := chip8{redrawRequired: true, pc: 0x200}
+	vm.loadFont()
+	vm.loadROM(romPath)
+	return &vm
 }
