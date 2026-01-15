@@ -5,16 +5,27 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
+type State int
+
+const (
+	Intro State = iota
+	RomLoadingFailed
+	RomLoaded
+	Working
+)
+
+var CurrentState State = Intro
+
 func main() {
 	var vm *chip8
 	romLoaded := false
-	rl.InitWindow(512, 256, "Chip8")
-	defer rl.CloseWindow()
 
-	rl.InitAudioDevice()
-	defer rl.CloseAudioDevice()
+	InitDisplay()
+	defer DeinitDisplay()
 
-	rl.SetTargetFPS(60)
+	InitAudio()
+	defer DeinitAudio()
+
 
 	for !rl.WindowShouldClose() {
 		if rl.IsFileDropped() {
@@ -39,7 +50,7 @@ func main() {
 }
 
 func newChip8Vm(romPath string) *chip8 {
-	vm := chip8{redrawRequired: true, pc: 0x200}
+	vm := chip8{pc: 0x200, stack: make([]uint16, 16)}
 	vm.loadFont()
 	vm.loadROM(romPath)
 	return &vm

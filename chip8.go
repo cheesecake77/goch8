@@ -22,16 +22,14 @@ var fontSet = []uint8{
 }
 
 type chip8 struct {
-	// TODO init memory
 	memory         [4096]uint8
-	display        [32][64]uint8
+	display        [32]uint64
 	pc             uint16
 	i              uint16
 	stack          []uint16
 	delay_timer    uint8
 	sound_timer    uint8
 	vx             [16]uint8
-	redrawRequired bool
 }
 
 // Methods
@@ -64,11 +62,25 @@ func (vm *chip8) cycle() {
 	}
 }
 
-// Op codes
+func (vm *chip8) push(val uint16) {
+	vm.stack = append(vm.stack, val)
+}
+
+func (vm *chip8) pop() uint16 {
+	if len(vm.stack) == 0 {
+		// or panic
+		return 0
+	}
+	i := len(vm.stack) - 1
+	val := vm.stack[i]
+	vm.stack = vm.stack[:i]
+	return val
+}
+// ### Op codes ###
 
 // Clear display
 func op00E0(vm *chip8) {
-	vm.display = [32][64]uint8{}
+	vm.display = [32]uint64{}
 }
 
 // Set PC to NNN
@@ -76,7 +88,20 @@ func op1NNN(vm *chip8, NNN uint16) {
 	vm.pc = NNN
 }
 
-// Set VX to NN
+// Go to subroutine in NNN address. Save current PC to stack
+func op2NNN(vm *chip8, NNN uint16){
+	vm.push(vm.pc)
+	vm.pc = NNN
+}
+
+// Skip instruction if Vx == NN
+func op3XNN(vm *chip8, X uint8, NN uint8){
+	if vm.vx[X] == NN{
+		vm.pc += 2
+	}
+}
+
+// Set Vx to NN
 func op6XNN(vm *chip8, X uint8, NN uint8) {
 	vm.vx[X] = NN
 }
@@ -93,6 +118,6 @@ func ANNN(vm *chip8, NNN uint16) {
 
 // Update display
 func opDXYN(vm *chip8, X uint8, Y uint16) {
+	// TODO
 	// draw
-	vm.redrawRequired = true
 }
