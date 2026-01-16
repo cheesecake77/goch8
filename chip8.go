@@ -22,14 +22,14 @@ var fontSet = []uint8{
 }
 
 type chip8 struct {
-	memory         [4096]uint8
-	display        [32]uint64
-	pc             uint16
-	i              uint16
-	stack          []uint16
-	delay_timer    uint8
-	sound_timer    uint8
-	vx             [16]uint8
+	memory      [4096]uint8
+	display     [32]uint64
+	pc          uint16
+	i           uint16
+	stack       []uint16
+	delay_timer uint8
+	sound_timer uint8
+	v           [16]uint8
 }
 
 // Methods
@@ -76,11 +76,20 @@ func (vm *chip8) pop() uint16 {
 	vm.stack = vm.stack[:i]
 	return val
 }
+
 // ### Op codes ###
 
 // Clear display
 func op00E0(vm *chip8) {
 	vm.display = [32]uint64{}
+}
+
+// Pop stack and set PC equal to the value
+func op00EE(vm *chip8) {
+	res := vm.pop()
+	if res != 0 {
+		vm.pc = res
+	}
 }
 
 // Set PC to NNN
@@ -89,30 +98,87 @@ func op1NNN(vm *chip8, NNN uint16) {
 }
 
 // Go to subroutine in NNN address. Save current PC to stack
-func op2NNN(vm *chip8, NNN uint16){
+func op2NNN(vm *chip8, NNN uint16) {
 	vm.push(vm.pc)
 	vm.pc = NNN
 }
 
 // Skip instruction if Vx == NN
-func op3XNN(vm *chip8, X uint8, NN uint8){
-	if vm.vx[X] == NN{
+func op3XNN(vm *chip8, X uint8, NN uint8) {
+	if vm.v[X] == NN {
+		vm.pc += 2
+	}
+}
+
+// Skip instruction if Vx != NN
+func op4XNN(vm *chip8, X, NN uint8) {
+	if vm.v[X] != NN {
+		vm.pc += 2
+	}
+}
+
+// Skip instruction if Vx = vy
+func op5XY0(vm *chip8, X, Y uint8) {
+	if vm.v[X] == vm.v[Y] {
 		vm.pc += 2
 	}
 }
 
 // Set Vx to NN
 func op6XNN(vm *chip8, X uint8, NN uint8) {
-	vm.vx[X] = NN
+	vm.v[X] = NN
 }
 
-// Increment VX by NN
+// Increment Vx by NN
 func op7XNN(vm *chip8, X uint8, NN uint8) {
-	vm.vx[X] += NN
+	vm.v[X] += NN
 }
 
+// Copy value from Vy to Vx
+func op8XY0(vm *chip8, X, Y uint8) {
+	vm.v[X] = vm.v[Y]
+}
+
+// Set Vx to Vx OR Vy
+func op8XY1(vm *chip8, X, Y uint8) {
+	vm.v[X] = vm.v[X] | vm.v[Y]
+}
+
+// Set Vx to Vx AND Vy
+func op8XY2(vm *chip8, X, Y uint8) {
+	vm.v[X] = vm.v[X] & vm.v[Y]
+}
+
+// Set Vx to Vx XOR Vy
+func op8XY3(vm *chip8, X, Y uint8) {
+	vm.v[X] = vm.v[X] ^ vm.v[Y]
+}
+
+// Set Vx to Vx + Vy and set VF to 1 if result is greater than 8 bits.
+// Only lowest 8 bits is stored in Vx
+func op8XY4(vm *chip8, X, Y uint8) {
+	var sum uint16 = (uint16)(vm.v[X]) + (uint16)(vm.v[Y])
+	if sum > 255 {
+		vm.v[0xf] = 1
+	} else {
+		vm.v[0xf] = 0
+	}
+	vm.v[X] = (uint8)(sum & 0x00FF)
+}
+
+// Sub Vx - Vy. If Vy > Vx set Vf to 1, else 0
+func op8XY5(vm *chip8, X, Y uint8) {
+	if vm.v[X] > vm.v[Y] {
+		vm.v[0xf] = 1
+	} else {
+		vm.v[0xf] = 0
+	}
+	vm.v[X] = vm.v[X] - vm.v[Y]
+}
+
+// pointer
 // Set I to NNN
-func ANNN(vm *chip8, NNN uint16) {
+func opANNN(vm *chip8, NNN uint16) {
 	vm.i = NNN
 }
 
