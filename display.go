@@ -12,3 +12,7 @@ func InitDisplay() {
 func DeinitDisplay() {
 	rl.CloseWindow()
 }
+
+func UpdateDisplay(display *[32]uint64) {
+
+}

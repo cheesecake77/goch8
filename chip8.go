@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"math/rand/v2"
+	"os"
+)
 
 var fontSet = []uint8{
 	0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -41,24 +44,111 @@ func (vm *chip8) loadFont() {
 	}
 }
 
-func (vm *chip8) loadROM(path string) {
-
+func (vm *chip8) loadROM(path string) error {
+data, err := os.ReadFile(path)
+    if err != nil {
+        return err
+    }
+    
+    // ROMs start at 0x200
+    for i, b := range data {
+        vm.memory[0x200+i] = b
+    }
+    
+    return nil
 }
 
 func (vm *chip8) cycle() {
 	opcode := (uint16)(vm.memory[vm.pc])<<8 | (uint16)(vm.memory[vm.pc+1])
 	vm.pc += 2
 
-	x := (opcode & 0x0F00) >> 8
-	y := (opcode & 0x00F0) >> 4
+	x := uint8((opcode & 0x0F00) >> 8)
+	y := uint8((opcode & 0x00F0) >> 4)
 	n := (opcode & 0x000F)
-	nn := (opcode & 0x00FF)
+	nn := uint8(opcode & 0x00FF)
 	nnn := (opcode & 0x0FFF)
 
 	switch opcode & 0xF000 {
 	case 0x0000:
-		fmt.Println(x, y, n, nn, nnn)
-
+		switch opcode {
+		case 0x00E0:
+			op00E0(vm)
+		case 0x00EE:
+			op00EE(vm)
+		}
+	case 0x1000:
+		op1NNN(vm, nnn)
+	case 0x2000:
+		op2NNN(vm, nnn)
+	case 0x3000:
+		op3XNN(vm, x, nn)
+	case 0x4000:
+		op4XNN(vm, x, nn)
+	case 0x5000:
+		op5XY0(vm, x, y)
+	case 0x6000:
+		op6XNN(vm, x, nn)
+	case 0x7000:
+		op7XNN(vm, x, nn)
+	case 0x8000:
+		switch n {
+		case 0x0:
+			op8XY0(vm, x, y)
+		case 0x1:
+			op8XY1(vm, x, y)
+		case 0x2:
+			op8XY2(vm, x, y)
+		case 0x3:
+			op8XY3(vm, x, y)
+		case 0x4:
+			op8XY4(vm, x, y)
+		case 0x5:
+			op8XY5(vm, x, y)
+		case 0x6:
+			op8XY6(vm, x)
+		case 0x7:
+			op8XY7(vm, x, y)
+		case 0xE:
+			op8XYE(vm, x)
+		}
+	case 0x9000:
+		op9XY0(vm, x, y)
+	case 0xA000:
+		opANNN(vm, nnn)
+	case 0xB000:
+		opBNNN(vm, nnn)
+	case 0xC000:
+		opCXNN(vm, x, nn)
+	case 0xD000:
+		opDXYN(vm, x, y, uint8(n))
+	case 0xE000:
+		switch nn {
+		case 0x9E:
+			opEX9E(vm, x)
+		case 0xA1:
+			opEXA1(vm, x)
+		}
+	case 0xF000:
+		switch nn {
+		case 0x07:
+			opFX07(vm, x)
+		case 0x0A:
+			opFX0A(vm, x)
+		case 0x15:
+			opFX15(vm, x)
+		case 0x18:
+			opFX18(vm, x)
+		case 0x1E:
+			opFX1E(vm, x)
+		case 0x29:
+			opFX29(vm, x)
+		case 0x33:
+			opFX33(vm, x)
+		case 0x55:
+			opFX55(vm, x)
+		case 0x65:
+			opFX65(vm, x)
+		}
 	}
 }
 
@@ -176,14 +266,124 @@ func op8XY5(vm *chip8, X, Y uint8) {
 	vm.v[X] = vm.v[X] - vm.v[Y]
 }
 
+// If most significant bit is 1 set VF to 1, else 0. Vx devided by 2
+func op8XY6(vm *chip8, X uint8) {
+	if (vm.v[X] & 0x01) == 1 {
+		vm.v[0xf] = 1
+	} else {
+		vm.v[0xf] = 0
+	}
+	vm.v[X] = vm.v[X] >> 1
+}
+
+// Sub Vx - Vy. If Vy < Vx set Vf to 1, else 0
+func op8XY7(vm *chip8, X, Y uint8) {
+	if vm.v[X] < vm.v[Y] {
+		vm.v[0xf] = 1
+	} else {
+		vm.v[0xf] = 0
+	}
+	vm.v[X] = vm.v[Y] - vm.v[X]
+}
+
+// If most significant bit is 1 set VF to 1, else 0. Vx devided by 2
+func op8XYE(vm *chip8, X uint8) {
+	if (vm.v[X] & 0x80) == 0x80 {
+		vm.v[0xf] = 1
+	} else {
+		vm.v[0xf] = 0
+	}
+	vm.v[X] = vm.v[X] << 1
+}
+
+// Skip next instruction if Vx != Vy
+func op9XY0(vm *chip8, X, Y uint8) {
+	if vm.v[X] != vm.v[Y] {
+		vm.pc += 2
+	}
+}
+
 // pointer
 // Set I to NNN
 func opANNN(vm *chip8, NNN uint16) {
 	vm.i = NNN
 }
 
-// Update display
-func opDXYN(vm *chip8, X uint8, Y uint16) {
+// Set PC equal to V0 + NNN
+func opBNNN(vm *chip8, NNN uint16) {
+	vm.pc = (uint16)(vm.v[0]) + NNN
+}
+
+// Set Vx to random byte AND NN
+func opCXNN(vm *chip8, X uint8, NN uint8) {
+	vm.v[X] = (uint8)(rand.IntN(256)) & NN
+}
+
+// Draw sprite
+func opDXYN(vm *chip8, X, Y, N uint8) {
 	// TODO
 	// draw
+}
+
+// Skip instruction if key numbered Vx is pressed
+func opEX9E(vm *chip8, X uint8) {
+	// TODO
+}
+
+// Skip instruction if key numbered Vx is not pressed
+func opEXA1(vm *chip8, X uint8) {
+	// TODO
+}
+
+// Set Vx = delay timer
+func opFX07(vm *chip8, X uint8) {
+	vm.v[X] = vm.delay_timer
+}
+
+// Wait for key press and store it in Vx
+func opFX0A(vm *chip8, X uint8) {
+	//TODO
+}
+
+// Set delay timer to Vx
+func opFX15(vm *chip8, X uint8) {
+	vm.delay_timer = vm.v[X]
+}
+
+// Set sound timer to Vx
+func opFX18(vm *chip8, X uint8) {
+	vm.sound_timer = vm.v[X]
+}
+
+// Increment I by Vx
+func opFX1E(vm *chip8, X uint8) {
+	vm.i += uint16(vm.v[X])
+}
+
+// Set I to the address of sprite for X
+func opFX29(vm *chip8, X uint8) {
+	// Start of font + size of one sprite multiplied by X
+	vm.i = uint16(0x50 + X*5)
+}
+
+// Store BCD of Vx in I, I+1 and I+2
+func opFX33(vm *chip8, X uint8) {
+	vm.memory[vm.i] = vm.v[X] / 100
+	vm.memory[vm.i+1] = (vm.v[X] / 10) % 10
+	vm.memory[vm.i+2] = vm.v[X] % 10
+}
+
+// Copy V0 to Vx to memory starting at I
+func opFX55(vm *chip8, X uint8) {
+	for i := 0; i <= int(X); i++ {
+		vm.memory[vm.i+uint16(i)] = vm.v[i]
+	}
+}
+
+// Write memory from I to registers Vx
+func opFX65(vm *chip8, X uint8) {
+	for i := 0; i <= int(X); i++ {
+		vm.v[i] = vm.memory[vm.i+uint16(i)]
+	}
+
 }

@@ -5,17 +5,6 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-type State int
-
-const (
-	Intro State = iota
-	RomLoadingFailed
-	RomLoaded
-	Working
-)
-
-var CurrentState State = Intro
-
 func main() {
 	var vm *chip8
 	romLoaded := false
