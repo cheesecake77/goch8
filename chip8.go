@@ -3,6 +3,7 @@ package main
 import (
 	"math/rand/v2"
 	"os"
+	"sync"
 )
 
 var fontSet = []uint8{
@@ -33,6 +34,7 @@ type chip8 struct {
 	delay_timer uint8
 	sound_timer uint8
 	v           [16]uint8
+	mu			sync.RWMutex
 }
 
 // Methods
@@ -58,7 +60,19 @@ data, err := os.ReadFile(path)
     return nil
 }
 
-func (vm *chip8) cycle() {
+func (vm *chip8) togglePixel(x, y uint8) bool {
+    mask := uint64(1) << (63 - x)
+    collision := vm.display[y]&mask != 0
+    vm.display[y] ^= mask
+    return collision
+}
+
+
+
+func (vm *chip8) Cycle() {
+	if vm.pc >= 0x0FFF {
+    return
+	}
 	opcode := (uint16)(vm.memory[vm.pc])<<8 | (uint16)(vm.memory[vm.pc+1])
 	vm.pc += 2
 
@@ -120,7 +134,9 @@ func (vm *chip8) cycle() {
 	case 0xC000:
 		opCXNN(vm, x, nn)
 	case 0xD000:
+		vm.mu.Lock()
 		opDXYN(vm, x, y, uint8(n))
+		vm.mu.Unlock()	
 	case 0xE000:
 		switch nn {
 		case 0x9E:
@@ -247,7 +263,7 @@ func op8XY3(vm *chip8, X, Y uint8) {
 // Set Vx to Vx + Vy and set VF to 1 if result is greater than 8 bits.
 // Only lowest 8 bits is stored in Vx
 func op8XY4(vm *chip8, X, Y uint8) {
-	var sum uint16 = (uint16)(vm.v[X]) + (uint16)(vm.v[Y])
+	sum := (uint16)(vm.v[X]) + (uint16)(vm.v[Y])
 	if sum > 255 {
 		vm.v[0xf] = 1
 	} else {
@@ -321,8 +337,25 @@ func opCXNN(vm *chip8, X uint8, NN uint8) {
 
 // Draw sprite
 func opDXYN(vm *chip8, X, Y, N uint8) {
-	// TODO
-	// draw
+    x0 := vm.v[X] & 63 // 0..63
+    y0 := vm.v[Y] & 31 // 0..31
+
+    vm.v[0xF] = 0
+
+    for row := uint8(0); row < N; row++ {
+        y := (y0 + row) & 31
+        sprite := vm.memory[vm.i+uint16(row)]
+
+        for bit := uint8(0); bit < 8; bit++ {
+            x := (x0 + bit) & 63
+
+            if (sprite>>(7-bit))&1 == 1 {
+                if vm.togglePixel(x, y) {
+                    vm.v[0xF] = 1
+                }
+            }
+        }
+    }
 }
 
 // Skip instruction if key numbered Vx is pressed
