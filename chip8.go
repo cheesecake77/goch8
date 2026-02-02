@@ -1,9 +1,11 @@
 package main
 
 import (
+	//"fmt"
 	"math/rand/v2"
 	"os"
 	"sync"
+	"sync/atomic"
 )
 
 var fontSet = []uint8{
@@ -26,15 +28,17 @@ var fontSet = []uint8{
 }
 
 type chip8 struct {
-	memory      [4096]uint8
-	display     [32]uint64
-	pc          uint16
-	i           uint16
-	stack       []uint16
-	delay_timer uint8
-	sound_timer uint8
-	v           [16]uint8
-	mu			sync.RWMutex
+	memory     [4096]uint8
+	display    [32]uint64
+	pc         uint16
+	i          uint16
+	stack      []uint16
+	delayTimer atomic.Uint32
+	soundTimer atomic.Uint32
+	v          [16]uint8
+	keyboard   [16]uint8
+	keyEvents  chan uint8
+	displayMU  sync.RWMutex
 }
 
 // Methods
@@ -47,35 +51,32 @@ func (vm *chip8) loadFont() {
 }
 
 func (vm *chip8) loadROM(path string) error {
-data, err := os.ReadFile(path)
-    if err != nil {
-        return err
-    }
-    
-    // ROMs start at 0x200
-    for i, b := range data {
-        vm.memory[0x200+i] = b
-    }
-    
-    return nil
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	// ROMs start at 0x200
+	for i, b := range data {
+		vm.memory[0x200+i] = b
+	}
+
+	return nil
 }
 
 func (vm *chip8) togglePixel(x, y uint8) bool {
-    mask := uint64(1) << (63 - x)
-    collision := vm.display[y]&mask != 0
-    vm.display[y] ^= mask
-    return collision
+	mask := uint64(1) << (63 - x)
+	collision := vm.display[y]&mask != 0
+	vm.display[y] ^= mask
+	return collision
 }
-
-
 
 func (vm *chip8) Cycle() {
 	if vm.pc >= 0x0FFF {
-    return
+		return
 	}
 	opcode := (uint16)(vm.memory[vm.pc])<<8 | (uint16)(vm.memory[vm.pc+1])
 	vm.pc += 2
-
 	x := uint8((opcode & 0x0F00) >> 8)
 	y := uint8((opcode & 0x00F0) >> 4)
 	n := (opcode & 0x000F)
@@ -134,9 +135,9 @@ func (vm *chip8) Cycle() {
 	case 0xC000:
 		opCXNN(vm, x, nn)
 	case 0xD000:
-		vm.mu.Lock()
+		vm.displayMU.Lock()
 		opDXYN(vm, x, y, uint8(n))
-		vm.mu.Unlock()	
+		vm.displayMU.Unlock()
 	case 0xE000:
 		switch nn {
 		case 0x9E:
@@ -174,8 +175,7 @@ func (vm *chip8) push(val uint16) {
 
 func (vm *chip8) pop() uint16 {
 	if len(vm.stack) == 0 {
-		// or panic
-		return 0
+		panic("ops")
 	}
 	i := len(vm.stack) - 1
 	val := vm.stack[i]
@@ -187,6 +187,8 @@ func (vm *chip8) pop() uint16 {
 
 // Clear display
 func op00E0(vm *chip8) {
+	vm.displayMU.Lock()
+	defer vm.displayMU.Unlock()
 	vm.display = [32]uint64{}
 }
 
@@ -337,55 +339,57 @@ func opCXNN(vm *chip8, X uint8, NN uint8) {
 
 // Draw sprite
 func opDXYN(vm *chip8, X, Y, N uint8) {
-    x0 := vm.v[X] & 63 // 0..63
-    y0 := vm.v[Y] & 31 // 0..31
+	x0 := vm.v[X] & 63 // 0..63
+	y0 := vm.v[Y] & 31 // 0..31
 
-    vm.v[0xF] = 0
+	vm.v[0xF] = 0
 
-    for row := uint8(0); row < N; row++ {
-        y := (y0 + row) & 31
-        sprite := vm.memory[vm.i+uint16(row)]
+	for row := range N {
+		y := (y0 + row) & 31
+		sprite := vm.memory[vm.i+uint16(row)]
 
-        for bit := uint8(0); bit < 8; bit++ {
-            x := (x0 + bit) & 63
+		for bit := range 8 {
+			x := (x0 + uint8(bit)) & 63
 
-            if (sprite>>(7-bit))&1 == 1 {
-                if vm.togglePixel(x, y) {
-                    vm.v[0xF] = 1
-                }
-            }
-        }
-    }
+			if (sprite>>(7-bit))&1 == 1 {
+				if vm.togglePixel(x, y) {
+					vm.v[0xF] = 1
+				}
+			}
+		}
+	}
 }
 
-// Skip instruction if key numbered Vx is pressed
 func opEX9E(vm *chip8, X uint8) {
-	// TODO
+	if vm.keyboard[vm.v[X]] == 1 {
+		vm.pc += 2
+	}
 }
 
-// Skip instruction if key numbered Vx is not pressed
 func opEXA1(vm *chip8, X uint8) {
-	// TODO
+	if vm.keyboard[vm.v[X]] == 0 {
+		vm.pc += 2
+	}
 }
 
 // Set Vx = delay timer
 func opFX07(vm *chip8, X uint8) {
-	vm.v[X] = vm.delay_timer
+	vm.v[X] = byte(vm.delayTimer.Load())
 }
 
 // Wait for key press and store it in Vx
 func opFX0A(vm *chip8, X uint8) {
-	//TODO
 }
+
 
 // Set delay timer to Vx
 func opFX15(vm *chip8, X uint8) {
-	vm.delay_timer = vm.v[X]
+	vm.delayTimer.Store(uint32(vm.v[X]))
 }
 
 // Set sound timer to Vx
 func opFX18(vm *chip8, X uint8) {
-	vm.sound_timer = vm.v[X]
+	vm.soundTimer.Store(uint32(vm.v[X]))
 }
 
 // Increment I by Vx
