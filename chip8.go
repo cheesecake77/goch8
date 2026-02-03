@@ -2,6 +2,7 @@ package main
 
 import (
 	//"fmt"
+	"fmt"
 	"math/rand/v2"
 	"os"
 	"sync"
@@ -36,9 +37,9 @@ type chip8 struct {
 	delayTimer atomic.Uint32
 	soundTimer atomic.Uint32
 	v          [16]uint8
-	keyboard   [16]uint8
-	keyEvents  chan uint8
+	keyboard   []bool
 	displayMU  sync.RWMutex
+	keypadMU   sync.RWMutex
 }
 
 // Methods
@@ -83,6 +84,7 @@ func (vm *chip8) Cycle() {
 	nn := uint8(opcode & 0x00FF)
 	nnn := (opcode & 0x0FFF)
 
+	//fmt.Print(opcode,x)
 	switch opcode & 0xF000 {
 	case 0x0000:
 		switch opcode {
@@ -361,13 +363,13 @@ func opDXYN(vm *chip8, X, Y, N uint8) {
 }
 
 func opEX9E(vm *chip8, X uint8) {
-	if vm.keyboard[vm.v[X]] == 1 {
+	if vm.keyboard[vm.v[X]] {
 		vm.pc += 2
 	}
 }
 
 func opEXA1(vm *chip8, X uint8) {
-	if vm.keyboard[vm.v[X]] == 0 {
+	if vm.keyboard[vm.v[X]] {
 		vm.pc += 2
 	}
 }
@@ -379,8 +381,19 @@ func opFX07(vm *chip8, X uint8) {
 
 // Wait for key press and store it in Vx
 func opFX0A(vm *chip8, X uint8) {
+	//vm.keypadMU.RLock()
+	localKeys := vm.keyboard
+	//vm.keypadMU.RUnlock()
+	for i, keyPressed := range localKeys {
+		if keyPressed {
+			vm.v[X] = uint8(i)
+			//fmt.Println("Нажато - ", i, " Записано в - ", X)
+			return
+		}
+	}
+	fmt.Println(vm.keyboard)
+	vm.pc -= 2
 }
-
 
 // Set delay timer to Vx
 func opFX15(vm *chip8, X uint8) {
@@ -400,7 +413,7 @@ func opFX1E(vm *chip8, X uint8) {
 // Set I to the address of sprite for X
 func opFX29(vm *chip8, X uint8) {
 	// Start of font + size of one sprite multiplied by X
-	vm.i = uint16(0x50 + X*5)
+	vm.i = uint16(0x50 + vm.v[X]*5)
 }
 
 // Store BCD of Vx in I, I+1 and I+2

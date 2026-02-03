@@ -1,7 +1,8 @@
 package main
 
+// rewrite to ebiten
 import (
-//	"fmt"
+	//	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -16,7 +17,7 @@ const cellSize = 16
 
 func InitDisplay() {
 	rl.InitWindow(64*cellSize, 32*cellSize, "Chip8")
-	rl.SetTargetFPS(60)
+	rl.SetTargetFPS(30)
 }
 
 func DeinitDisplay() {
@@ -43,7 +44,13 @@ func UpdateDisplay(display *[32]uint64) {
 }
 
 func UpdateKeyboard(vm *chip8) {
+	if vm.keypadMU.TryLock() {
+		for key, chip8Key := range keyMap {
+			vm.keyboard[chip8Key] = rl.IsKeyDown(key)
 
+		}
+		vm.keypadMU.Unlock()
+	}
 }
 
 var keyMap = map[int32]uint8{

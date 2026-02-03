@@ -1,9 +1,11 @@
 package main
 
 import (
+	//"fmt"
 	"fmt"
-	rl "github.com/gen2brain/raylib-go/raylib"
 	"time"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 func main() {
@@ -26,7 +28,6 @@ func main() {
 			fmt.Println(list[0])
 			if halt != nil {
 				close(halt)
-				halt = nil
 			}
 
 			vm = newChip8Vm(list[0])
@@ -45,9 +46,26 @@ func main() {
 					}
 				}
 			}(vm, halt)
+
+			go func (localVm *chip8, halt chan bool) {
+				delayTicker := time.NewTicker(time.Second / 60)
+				defer delayTicker.Stop()
+				for {
+					select {
+					case <-halt:
+						return
+					case <-delayTicker.C:
+						i := localVm.delayTimer.Load() 
+						if  i > 0 {
+							localVm.delayTimer.Store(uint32(i-1))
+
+						}
+					}
+				}
+			}(vm, halt)
 		}
 		rl.BeginDrawing()
-		rl.ClearBackground(rl.Black)
+		rl.ClearBackground(rl.Black) 
 		if !romLoaded {
 			// TODO move to display and scale to fit different cell_size
 			rl.DrawText("Drag&Drop .c8 or .ch8 ROM here!", 130, 120, 20, rl.RayWhite)
@@ -64,9 +82,9 @@ func main() {
 
 func newChip8Vm(romPath string) *chip8 {
 	vm := chip8{
-		pc:        0x200,
-		stack:     make([]uint16, 16),
-		keyEvents: make(chan uint8, 1),
+		pc:       0x200,
+		stack:    make([]uint16, 16),
+		keyboard: make([]bool, 16),
 	}
 	vm.loadFont()
 	err := vm.loadROM(romPath)
