@@ -2,7 +2,6 @@ package main
 
 import (
 	//"fmt"
-	"fmt"
 	"math/rand/v2"
 	"os"
 	"sync"
@@ -29,17 +28,17 @@ var fontSet = []uint8{
 }
 
 type chip8 struct {
-	memory     [4096]uint8
-	display    [32]uint64
-	pc         uint16
-	i          uint16
-	stack      []uint16
-	delayTimer atomic.Uint32
-	soundTimer atomic.Uint32
-	v          [16]uint8
-	keyboard   []bool
-	displayMU  sync.RWMutex
-	keypadMU   sync.RWMutex
+	memory         [4096]uint8
+	display        [32]uint64
+	pc             uint16
+	i              uint16
+	stack          []uint16
+	delayTimer     atomic.Uint32
+	soundTimer     atomic.Uint32
+	v              [16]uint8
+	keyboard       []bool
+	displayMU      sync.RWMutex
+	keypadMU       sync.RWMutex
 }
 
 // Methods
@@ -89,7 +88,9 @@ func (vm *chip8) Cycle() {
 	case 0x0000:
 		switch opcode {
 		case 0x00E0:
+			vm.displayMU.Lock()
 			op00E0(vm)
+			vm.displayMU.Unlock()
 		case 0x00EE:
 			op00EE(vm)
 		}
@@ -176,7 +177,7 @@ func (vm *chip8) push(val uint16) {
 }
 
 func (vm *chip8) pop() uint16 {
-	if len(vm.stack) == 0 {
+	if len(vm.stack) < 1 {
 		panic("ops")
 	}
 	i := len(vm.stack) - 1
@@ -189,17 +190,12 @@ func (vm *chip8) pop() uint16 {
 
 // Clear display
 func op00E0(vm *chip8) {
-	vm.displayMU.Lock()
-	defer vm.displayMU.Unlock()
 	vm.display = [32]uint64{}
 }
 
 // Pop stack and set PC equal to the value
 func op00EE(vm *chip8) {
-	res := vm.pop()
-	if res != 0 {
-		vm.pc = res
-	}
+	vm.pc = vm.pop()
 }
 
 // Set PC to NNN
@@ -341,11 +337,10 @@ func opCXNN(vm *chip8, X uint8, NN uint8) {
 
 // Draw sprite
 func opDXYN(vm *chip8, X, Y, N uint8) {
-	x0 := vm.v[X] & 63 // 0..63
-	y0 := vm.v[Y] & 31 // 0..31
+	x0 := vm.v[X] & 63
+	y0 := vm.v[Y] & 31
 
 	vm.v[0xF] = 0
-
 	for row := range N {
 		y := (y0 + row) & 31
 		sprite := vm.memory[vm.i+uint16(row)]
@@ -357,7 +352,7 @@ func opDXYN(vm *chip8, X, Y, N uint8) {
 				if vm.togglePixel(x, y) {
 					vm.v[0xF] = 1
 				}
-			}
+			} 
 		}
 	}
 }
@@ -369,7 +364,7 @@ func opEX9E(vm *chip8, X uint8) {
 }
 
 func opEXA1(vm *chip8, X uint8) {
-	if vm.keyboard[vm.v[X]] {
+	if !vm.keyboard[vm.v[X]] {
 		vm.pc += 2
 	}
 }
@@ -381,17 +376,13 @@ func opFX07(vm *chip8, X uint8) {
 
 // Wait for key press and store it in Vx
 func opFX0A(vm *chip8, X uint8) {
-	//vm.keypadMU.RLock()
 	localKeys := vm.keyboard
-	//vm.keypadMU.RUnlock()
 	for i, keyPressed := range localKeys {
 		if keyPressed {
 			vm.v[X] = uint8(i)
-			//fmt.Println("Нажато - ", i, " Записано в - ", X)
 			return
 		}
 	}
-	fmt.Println(vm.keyboard)
 	vm.pc -= 2
 }
 

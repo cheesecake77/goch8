@@ -1,6 +1,5 @@
 package main
 
-// rewrite to ebiten
 import (
 	//	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -14,10 +13,11 @@ const (
 	Released
 )
 const cellSize = 16
+const fps = 60
 
 func InitDisplay() {
 	rl.InitWindow(64*cellSize, 32*cellSize, "Chip8")
-	rl.SetTargetFPS(30)
+	rl.SetTargetFPS(fps)
 }
 
 func DeinitDisplay() {

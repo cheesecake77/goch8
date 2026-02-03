@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"fmt"
 	"time"
 
@@ -20,7 +19,7 @@ func main() {
 
 	// start sound timer 60Hz
 	// start delay timer 60Hz
-
+	StartBeep()
 	// 60Hz display loop
 	for !rl.WindowShouldClose() {
 		if rl.IsFileDropped() {
@@ -47,7 +46,7 @@ func main() {
 				}
 			}(vm, halt)
 
-			go func (localVm *chip8, halt chan bool) {
+			go func(localVm *chip8, halt chan bool) {
 				delayTicker := time.NewTicker(time.Second / 60)
 				defer delayTicker.Stop()
 				for {
@@ -55,9 +54,9 @@ func main() {
 					case <-halt:
 						return
 					case <-delayTicker.C:
-						i := localVm.delayTimer.Load() 
-						if  i > 0 {
-							localVm.delayTimer.Store(uint32(i-1))
+						i := localVm.delayTimer.Load()
+						if i > 0 {
+							localVm.delayTimer.Store(uint32(i - 1))
 
 						}
 					}
@@ -65,15 +64,15 @@ func main() {
 			}(vm, halt)
 		}
 		rl.BeginDrawing()
-		rl.ClearBackground(rl.Black) 
+		rl.ClearBackground(rl.Black)
 		if !romLoaded {
 			// TODO move to display and scale to fit different cell_size
 			rl.DrawText("Drag&Drop .c8 or .ch8 ROM here!", 130, 120, 20, rl.RayWhite)
 		} else {
 			vm.displayMU.RLock()
 			localDisplay := vm.display
-			vm.displayMU.RUnlock()
 			UpdateDisplay(&localDisplay)
+			vm.displayMU.RUnlock()
 			UpdateKeyboard(vm)
 		}
 		rl.EndDrawing()
@@ -83,7 +82,7 @@ func main() {
 func newChip8Vm(romPath string) *chip8 {
 	vm := chip8{
 		pc:       0x200,
-		stack:    make([]uint16, 16),
+		stack:    make([]uint16, 0, 16),
 		keyboard: make([]bool, 16),
 	}
 	vm.loadFont()
