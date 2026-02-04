@@ -1,0 +1,49 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - vendor
+
+output:
+  style: colored-tab
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - revive
+    - errorlint
+    - nilerr
+    - bodyclose
+    - rowserrcheck
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  revive:
+    rules:
+      - name: var-naming
+      - name: error-naming
+      - name: error-return
+      - name: early-return
+      - name: indent-error-flow
+      - name: exported
+
+  goimports:
+    local-prefixes: your/module/name
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - revive

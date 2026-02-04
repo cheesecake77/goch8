@@ -28,17 +28,17 @@ var fontSet = []uint8{
 }
 
 type chip8 struct {
-	memory         [4096]uint8
-	display        [32]uint64
-	pc             uint16
-	i              uint16
-	stack          []uint16
-	delayTimer     atomic.Uint32
-	soundTimer     atomic.Uint32
-	v              [16]uint8
-	keyboard       []bool
-	displayMU      sync.RWMutex
-	keypadMU       sync.RWMutex
+	memory     [4096]uint8
+	display    [32]uint64
+	pc         uint16
+	i          uint16
+	stack      []uint16
+	delayTimer atomic.Uint32
+	soundTimer atomic.Uint32
+	v          [16]uint8
+	keyboard   []bool
+	displayMU  sync.RWMutex
+	keypadMU   sync.RWMutex
 }
 
 // Methods
@@ -51,6 +51,7 @@ func (vm *chip8) loadFont() {
 }
 
 func (vm *chip8) loadROM(path string) error {
+	// TODO check size and extension
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -352,7 +353,7 @@ func opDXYN(vm *chip8, X, Y, N uint8) {
 				if vm.togglePixel(x, y) {
 					vm.v[0xF] = 1
 				}
-			} 
+			}
 		}
 	}
 }

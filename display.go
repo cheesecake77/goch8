@@ -24,6 +24,10 @@ func DeinitDisplay() {
 	rl.CloseWindow()
 }
 
+func DrawIntro() {
+	rl.DrawText("Drag&Drop .c8 or .ch8 ROM here!", 130, 120, 20, rl.RayWhite)
+}
+
 func UpdateDisplay(display *[32]uint64) {
 	var x, y int32
 	y = 0

@@ -14,13 +14,9 @@ func main() {
 	defer DeinitDisplay()
 	InitAudio()
 	defer DeinitAudio()
-	// start chip8 cycles 600Hz
 	var halt chan bool
 
-	// start sound timer 60Hz
-	// start delay timer 60Hz
-	StartBeep()
-	// 60Hz display loop
+	//StartBeeper()
 	for !rl.WindowShouldClose() {
 		if rl.IsFileDropped() {
 			list := rl.LoadDroppedFiles()
@@ -33,6 +29,7 @@ func main() {
 			rl.UnloadDroppedFiles()
 			romLoaded = true
 			halt = make(chan bool)
+			StartBeeper()
 			go func(localVm *chip8, halt chan bool) {
 				cpuTicker := time.NewTicker(time.Second / 500)
 				defer cpuTicker.Stop()
@@ -62,18 +59,41 @@ func main() {
 					}
 				}
 			}(vm, halt)
+
+			go func(localVm *chip8, halt chan bool) {
+				soundTicker := time.NewTicker(time.Second / 60)
+				defer soundTicker.Stop()
+				for {
+					select {
+					case <-halt:
+						return
+					case <-soundTicker.C:
+						i := localVm.soundTimer.Load()
+						if i > 0 {
+							localVm.soundTimer.Store(uint32(i - 1))
+
+						}
+					}
+				}
+			}(vm, halt)
 		}
+		UpdateBeep()
+
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
 		if !romLoaded {
-			// TODO move to display and scale to fit different cell_size
-			rl.DrawText("Drag&Drop .c8 or .ch8 ROM here!", 130, 120, 20, rl.RayWhite)
+			DrawIntro()
 		} else {
 			vm.displayMU.RLock()
 			localDisplay := vm.display
 			UpdateDisplay(&localDisplay)
 			vm.displayMU.RUnlock()
 			UpdateKeyboard(vm)
+			if vm.soundTimer.Load() > 0 {
+				ResumeBeeper()
+			} else {
+				PauseBeeper()
+			}
 		}
 		rl.EndDrawing()
 	}
