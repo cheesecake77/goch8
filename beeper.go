@@ -1,33 +1,41 @@
 package main
 
 import (
-	"math"
-
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"math"
 )
 
 var (
-	stream    rl.AudioStream
-	isPlaying bool
-	phase     float64
+	stream     rl.AudioStream
+	isPlaying  bool
+	phase      float64
+	data       []int16   = make([]int16, maxSamples)
+	writeBuf   []float32 = make([]float32, maxSamplesPerUpdate) // float32 для UpdateAudioStrea
+	waveLength int       = 128 
 )
 
 const (
-	frequency  = 440.0
-	sampleRate = 44100
+	frequency           = 440.0
+	sampleRate          = 44100
+	maxSamplesPerUpdate = 4096
+	maxSamples          = 512
 )
 
 func InitAudio() {
 	rl.InitAudioDevice()
 
-	stream = rl.LoadAudioStream(sampleRate, 32, 2)
+	rl.SetAudioStreamBufferSizeDefault(maxSamplesPerUpdate)
+	stream = rl.LoadAudioStream(sampleRate, 16, 1)
 	rl.SetAudioStreamVolume(stream, 0.1)
-	rl.SetAudioStreamBufferSizeDefault(4096)
-	rl.PauseAudioStream(stream)
+	isPlaying = true
 
-	isPlaying = false
+	for i := 0; i < waveLength*2; i++ {
+		data[i] = int16(math.Sin(2*math.Pi*float64(i)/float64(waveLength)) * 32000)
+	}
+	for j := waveLength * 2; j < maxSamples; j++ {
+		data[j] = 0
+	}
 }
-
 func DeinitAudio() {
 	if rl.IsAudioStreamPlaying(stream) {
 		rl.StopAudioStream(stream)
@@ -68,16 +76,26 @@ func ResumeBeeper() {
 
 func UpdateBeep() {
 	if rl.IsAudioStreamProcessed(stream) {
-		numFrames := 512
-		samples := make([]float32, numFrames*2)
+		readCursor := 0
+		writeCursor := 0
 
-		for i := range numFrames {
-			sample := float32(math.Sin(phase))
-			samples[i*2] = sample
-			samples[i*2+1] = sample
+		for writeCursor < maxSamplesPerUpdate {
+			writeLength := maxSamplesPerUpdate - writeCursor
+			readLength := waveLength - readCursor
 
-			phase += 2 * math.Pi * frequency / sampleRate
+			if writeLength > readLength {
+				writeLength = readLength
+			}
+
+			// Конвертируем int16 в float32 (normalized -1.0 to 1.0)
+			for i := 0; i < writeLength; i++ {
+				writeBuf[writeCursor+i] = float32(data[readCursor+i]) / 32768.0
+			}
+
+			readCursor = (readCursor + writeLength) % waveLength
+			writeCursor += writeLength
 		}
-		rl.UpdateAudioStream(stream, samples)
+
+		rl.UpdateAudioStream(stream, writeBuf)
 	}
 }

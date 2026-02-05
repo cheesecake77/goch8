@@ -51,7 +51,6 @@ func UpdateKeyboard(vm *chip8) {
 	if vm.keypadMU.TryLock() {
 		for key, chip8Key := range keyMap {
 			vm.keyboard[chip8Key] = rl.IsKeyDown(key)
-
 		}
 		vm.keypadMU.Unlock()
 	}
