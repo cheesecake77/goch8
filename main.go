@@ -2,99 +2,63 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 func main() {
 	var vm *chip8
-	romLoaded := false
+
 	InitDisplay()
 	defer DeinitDisplay()
+
 	InitAudio()
 	defer DeinitAudio()
-	var halt chan bool
+
+	const cyclesPerFrame = 8 //500Hz/60Hz
 
 	//StartBeeper()
+	var romLoaded bool = false
+
 	for !rl.WindowShouldClose() {
 		if rl.IsFileDropped() {
 			list := rl.LoadDroppedFiles()
 			fmt.Println(list[0])
-			if halt != nil {
-				close(halt)
-			}
 
 			vm = newChip8Vm(list[0])
 			rl.UnloadDroppedFiles()
 			romLoaded = true
-			halt = make(chan bool)
 			StartBeeper()
-			go func(localVm *chip8, halt chan bool) {
-				cpuTicker := time.NewTicker(time.Second / 500)
-				defer cpuTicker.Stop()
-				for {
-					select {
-					case <-halt:
-						return
-					case <-cpuTicker.C:
-						localVm.Cycle()
-					}
-				}
-			}(vm, halt)
-
-			go func(localVm *chip8, halt chan bool) {
-				delayTicker := time.NewTicker(time.Second / 60)
-				defer delayTicker.Stop()
-				for {
-					select {
-					case <-halt:
-						return
-					case <-delayTicker.C:
-						i := localVm.delayTimer.Load()
-						if i > 0 {
-							localVm.delayTimer.Store(uint32(i - 1))
-
-						}
-					}
-				}
-			}(vm, halt)
-
-			go func(localVm *chip8, halt chan bool) {
-				soundTicker := time.NewTicker(time.Second / 60)
-				defer soundTicker.Stop()
-				for {
-					select {
-					case <-halt:
-						return
-					case <-soundTicker.C:
-						i := localVm.soundTimer.Load()
-						if i > 0 {
-							localVm.soundTimer.Store(uint32(i - 1))
-
-						}
-					}
-				}
-			}(vm, halt)
 		}
+
+		if !romLoaded {
+			rl.BeginDrawing()
+			rl.ClearBackground(rl.Black)
+			DrawIntro()
+			rl.EndDrawing()
+			fmt.Printf("we are in no rom load")
+			continue
+		}
+
+		UpdateKeyboard(vm)
 		UpdateBeep()
+		vm.tickTimers()
+
+		for i := range cyclesPerFrame {
+			fmt.Printf("cycle %d", i)
+			vm.Cycle()
+		}
+
+   		if vm.soundTimer > 0 {
+       		ResumeBeeper()
+   		} else {
+       		PauseBeeper()
+		}
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
-		if !romLoaded {
-			DrawIntro()
-		} else {
-			vm.displayMU.RLock()
-			localDisplay := vm.display
-			UpdateDisplay(&localDisplay)
-			vm.displayMU.RUnlock()
-			UpdateKeyboard(vm)
-			if vm.soundTimer.Load() > 0 {
-				ResumeBeeper()
-			} else {
-				PauseBeeper()
-			}
-		}
+		UpdateDisplay(&vm.display)
+		fmt.Printf("display should be update")
 		rl.EndDrawing()
 	}
 }

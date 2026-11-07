@@ -1,11 +1,9 @@
 package main
 
 import (
-	//"fmt"
 	"math/rand/v2"
 	"os"
 	"sync"
-	"sync/atomic"
 )
 
 var fontSet = []uint8{
@@ -33,8 +31,8 @@ type chip8 struct {
 	pc         uint16
 	i          uint16
 	stack      []uint16
-	delayTimer atomic.Uint32
-	soundTimer atomic.Uint32
+	delayTimer uint8
+	soundTimer uint8
 	v          [16]uint8
 	keyboard   []bool
 	displayMU  sync.RWMutex
@@ -42,6 +40,18 @@ type chip8 struct {
 }
 
 // Methods
+
+func (vm *chip8) tickTimers() {
+
+	if vm.delayTimer >0 {
+		vm.delayTimer--
+	}
+
+	if vm.soundTimer >0 {
+		vm.soundTimer--
+	}
+}
+
 func (vm *chip8) loadFont() {
 	pointer := 0x50
 	for _, value := range fontSet {
@@ -372,7 +382,7 @@ func opEXA1(vm *chip8, X uint8) {
 
 // Set Vx = delay timer
 func opFX07(vm *chip8, X uint8) {
-	vm.v[X] = byte(vm.delayTimer.Load())
+	vm.v[X] = X
 }
 
 // Wait for key press and store it in Vx
@@ -389,12 +399,12 @@ func opFX0A(vm *chip8, X uint8) {
 
 // Set delay timer to Vx
 func opFX15(vm *chip8, X uint8) {
-	vm.delayTimer.Store(uint32(vm.v[X]))
+	vm.delayTimer = X
 }
 
 // Set sound timer to Vx
 func opFX18(vm *chip8, X uint8) {
-	vm.soundTimer.Store(uint32(vm.v[X]))
+	vm.soundTimer = X
 }
 
 // Increment I by Vx
