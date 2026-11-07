@@ -1,7 +1,6 @@
 package main
 
 import (
-	//	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -48,13 +47,10 @@ func UpdateDisplay(display *[32]uint64) {
 }
 
 func UpdateKeyboard(vm *chip8) {
-	if vm.keypadMU.TryLock() {
 		for key, chip8Key := range keyMap {
 			vm.keyboard[chip8Key] = rl.IsKeyDown(key)
 		}
-		vm.keypadMU.Unlock()
 	}
-}
 
 var keyMap = map[int32]uint8{
 	rl.KeyOne:   0x1,

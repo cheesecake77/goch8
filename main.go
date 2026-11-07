@@ -36,7 +36,6 @@ func main() {
 			rl.ClearBackground(rl.Black)
 			DrawIntro()
 			rl.EndDrawing()
-			fmt.Printf("we are in no rom load")
 			continue
 		}
 
@@ -44,8 +43,7 @@ func main() {
 		UpdateBeep()
 		vm.tickTimers()
 
-		for i := range cyclesPerFrame {
-			fmt.Printf("cycle %d", i)
+		for range cyclesPerFrame {
 			vm.Cycle()
 		}
 
@@ -58,7 +56,6 @@ func main() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
 		UpdateDisplay(&vm.display)
-		fmt.Printf("display should be update")
 		rl.EndDrawing()
 	}
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"math/rand/v2"
 	"os"
-	"sync"
 )
 
 var fontSet = []uint8{
@@ -35,19 +34,17 @@ type chip8 struct {
 	soundTimer uint8
 	v          [16]uint8
 	keyboard   []bool
-	displayMU  sync.RWMutex
-	keypadMU   sync.RWMutex
 }
 
 // Methods
 
 func (vm *chip8) tickTimers() {
 
-	if vm.delayTimer >0 {
+	if vm.delayTimer > 0 {
 		vm.delayTimer--
 	}
 
-	if vm.soundTimer >0 {
+	if vm.soundTimer > 0 {
 		vm.soundTimer--
 	}
 }
@@ -99,9 +96,7 @@ func (vm *chip8) Cycle() {
 	case 0x0000:
 		switch opcode {
 		case 0x00E0:
-			vm.displayMU.Lock()
 			op00E0(vm)
-			vm.displayMU.Unlock()
 		case 0x00EE:
 			op00EE(vm)
 		}
@@ -149,9 +144,7 @@ func (vm *chip8) Cycle() {
 	case 0xC000:
 		opCXNN(vm, x, nn)
 	case 0xD000:
-		vm.displayMU.Lock()
 		opDXYN(vm, x, y, uint8(n))
-		vm.displayMU.Unlock()
 	case 0xE000:
 		switch nn {
 		case 0x9E:
@@ -382,7 +375,7 @@ func opEXA1(vm *chip8, X uint8) {
 
 // Set Vx = delay timer
 func opFX07(vm *chip8, X uint8) {
-	vm.v[X] = X
+	vm.v[X] = vm.delayTimer
 }
 
 // Wait for key press and store it in Vx
@@ -399,12 +392,12 @@ func opFX0A(vm *chip8, X uint8) {
 
 // Set delay timer to Vx
 func opFX15(vm *chip8, X uint8) {
-	vm.delayTimer = X
+	vm.delayTimer = vm.v[X]
 }
 
 // Set sound timer to Vx
 func opFX18(vm *chip8, X uint8) {
-	vm.soundTimer = X
+	vm.soundTimer = vm.v[X]
 }
 
 // Increment I by Vx
