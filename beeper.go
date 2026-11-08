@@ -1,15 +1,16 @@
 package main
 
 import (
-	rl "github.com/gen2brain/raylib-go/raylib"
 	"math"
+	
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 var (
 	stream     rl.AudioStream
 	isPlaying  bool
 	data       = make([]int16, maxSamples)
-	writeBuf   = make([]float32, maxSamplesPerUpdate) // float32 для UpdateAudioStrea
+	writeBuf   = make([]float32, maxSamplesPerUpdate)
 	waveLength = 128 
 )
 
@@ -87,7 +88,6 @@ func UpdateBeep() {
 				writeLength = readLength
 			}
 
-			// Конвертируем int16 в float32 (normalized -1.0 to 1.0)
 			for i := 0; i < writeLength; i++ {
 				writeBuf[writeCursor+i] = float32(data[readCursor+i]) / 32768.0
 			}

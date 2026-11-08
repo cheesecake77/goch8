@@ -91,7 +91,6 @@ func (vm *chip8) Cycle() {
 	nn := uint8(opcode & 0x00FF)
 	nnn := (opcode & 0x0FFF)
 
-	//fmt.Print(opcode,x)
 	switch opcode & 0xF000 {
 	case 0x0000:
 		switch opcode {
@@ -182,7 +181,7 @@ func (vm *chip8) push(val uint16) {
 
 func (vm *chip8) pop() uint16 {
 	if len(vm.stack) < 1 {
-		panic("ops")
+		panic("Attempt to pop from empty stack")
 	}
 	i := len(vm.stack) - 1
 	val := vm.stack[i]
@@ -323,7 +322,6 @@ func op9XY0(vm *chip8, X, Y uint8) {
 	}
 }
 
-// pointer
 // Set I to NNN
 func opANNN(vm *chip8, NNN uint16) {
 	vm.i = NNN
@@ -361,12 +359,14 @@ func opDXYN(vm *chip8, X, Y, N uint8) {
 	}
 }
 
+// Skip next instruction if key with the value of Vx is pressed
 func opEX9E(vm *chip8, X uint8) {
 	if vm.keyboard[vm.v[X]] {
 		vm.pc += 2
 	}
 }
 
+// Skip next instruction if key with the value of Vx is not pressed
 func opEXA1(vm *chip8, X uint8) {
 	if !vm.keyboard[vm.v[X]] {
 		vm.pc += 2
