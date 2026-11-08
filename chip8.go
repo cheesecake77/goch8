@@ -3,6 +3,7 @@ package main
 import (
 	"math/rand/v2"
 	"os"
+	"errors"
 )
 
 var fontSet = []uint8{
@@ -38,6 +39,20 @@ type chip8 struct {
 
 // Methods
 
+func NewChip8Vm(romPath string) *chip8 {
+	vm := chip8{
+		pc:       0x200,
+		stack:    make([]uint16, 0, 16),
+		keyboard: make([]bool, 16),
+	}
+	vm.loadFont()
+	err := vm.loadROM(romPath)
+	if err != nil {
+		panic(err)
+	}
+	return &vm
+}
+
 func (vm *chip8) tickTimers() {
 
 	if vm.delayTimer > 0 {
@@ -58,10 +73,12 @@ func (vm *chip8) loadFont() {
 }
 
 func (vm *chip8) loadROM(path string) error {
-	// TODO check size and extension
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
+	}
+	if len(data) > len(vm.memory) - 0x200 {
+		return errors.New("ROM is too big")
 	}
 
 	// ROMs start at 0x200

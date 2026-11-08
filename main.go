@@ -25,7 +25,7 @@ func main() {
 			list := rl.LoadDroppedFiles()
 			fmt.Println(list[0])
 
-			vm = newChip8Vm(list[0])
+			vm = NewChip8Vm(list[0])
 			rl.UnloadDroppedFiles()
 			romLoaded = true
 			StartBeeper()
@@ -60,16 +60,4 @@ func main() {
 	}
 }
 
-func newChip8Vm(romPath string) *chip8 {
-	vm := chip8{
-		pc:       0x200,
-		stack:    make([]uint16, 0, 16),
-		keyboard: make([]bool, 16),
-	}
-	vm.loadFont()
-	err := vm.loadROM(romPath)
-	if err != nil {
-		panic(err)
-	}
-	return &vm
-}
+
