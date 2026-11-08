@@ -1,3 +1,4 @@
+// Chip8 interpreter/emulator in Go using Raylib
 package main
 
 import (
@@ -17,8 +18,7 @@ func main() {
 
 	const cyclesPerFrame = 8 //500Hz/60Hz
 
-	//StartBeeper()
-	var romLoaded bool = false
+	romLoaded := false
 
 	for !rl.WindowShouldClose() {
 		if rl.IsFileDropped() {

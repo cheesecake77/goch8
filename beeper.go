@@ -8,12 +8,12 @@ import (
 var (
 	stream     rl.AudioStream
 	isPlaying  bool
-	phase      float64
-	data       []int16   = make([]int16, maxSamples)
-	writeBuf   []float32 = make([]float32, maxSamplesPerUpdate) // float32 для UpdateAudioStrea
-	waveLength int       = 128 
+	data       = make([]int16, maxSamples)
+	writeBuf   = make([]float32, maxSamplesPerUpdate) // float32 для UpdateAudioStrea
+	waveLength = 128 
 )
 
+ 
 const (
 	frequency           = 440.0
 	sampleRate          = 44100
