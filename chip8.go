@@ -1,11 +1,9 @@
 package main
 
 import (
-	//"fmt"
 	"math/rand/v2"
 	"os"
-	"sync"
-	"sync/atomic"
+	"errors"
 )
 
 var fontSet = []uint8{
@@ -33,15 +31,39 @@ type chip8 struct {
 	pc         uint16
 	i          uint16
 	stack      []uint16
-	delayTimer atomic.Uint32
-	soundTimer atomic.Uint32
+	delayTimer uint8
+	soundTimer uint8
 	v          [16]uint8
 	keyboard   []bool
-	displayMU  sync.RWMutex
-	keypadMU   sync.RWMutex
 }
 
 // Methods
+
+func NewChip8Vm(romPath string) *chip8 {
+	vm := chip8{
+		pc:       0x200,
+		stack:    make([]uint16, 0, 16),
+		keyboard: make([]bool, 16),
+	}
+	vm.loadFont()
+	err := vm.loadROM(romPath)
+	if err != nil {
+		panic(err)
+	}
+	return &vm
+}
+
+func (vm *chip8) tickTimers() {
+
+	if vm.delayTimer > 0 {
+		vm.delayTimer--
+	}
+
+	if vm.soundTimer > 0 {
+		vm.soundTimer--
+	}
+}
+
 func (vm *chip8) loadFont() {
 	pointer := 0x50
 	for _, value := range fontSet {
@@ -51,10 +73,12 @@ func (vm *chip8) loadFont() {
 }
 
 func (vm *chip8) loadROM(path string) error {
-	// TODO check size and extension
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
+	}
+	if len(data) > len(vm.memory) - 0x200 {
+		return errors.New("ROM is too big")
 	}
 
 	// ROMs start at 0x200
@@ -84,14 +108,11 @@ func (vm *chip8) Cycle() {
 	nn := uint8(opcode & 0x00FF)
 	nnn := (opcode & 0x0FFF)
 
-	//fmt.Print(opcode,x)
 	switch opcode & 0xF000 {
 	case 0x0000:
 		switch opcode {
 		case 0x00E0:
-			vm.displayMU.Lock()
 			op00E0(vm)
-			vm.displayMU.Unlock()
 		case 0x00EE:
 			op00EE(vm)
 		}
@@ -139,9 +160,7 @@ func (vm *chip8) Cycle() {
 	case 0xC000:
 		opCXNN(vm, x, nn)
 	case 0xD000:
-		vm.displayMU.Lock()
 		opDXYN(vm, x, y, uint8(n))
-		vm.displayMU.Unlock()
 	case 0xE000:
 		switch nn {
 		case 0x9E:
@@ -179,7 +198,7 @@ func (vm *chip8) push(val uint16) {
 
 func (vm *chip8) pop() uint16 {
 	if len(vm.stack) < 1 {
-		panic("ops")
+		panic("Attempt to pop from empty stack")
 	}
 	i := len(vm.stack) - 1
 	val := vm.stack[i]
@@ -320,7 +339,6 @@ func op9XY0(vm *chip8, X, Y uint8) {
 	}
 }
 
-// pointer
 // Set I to NNN
 func opANNN(vm *chip8, NNN uint16) {
 	vm.i = NNN
@@ -358,12 +376,14 @@ func opDXYN(vm *chip8, X, Y, N uint8) {
 	}
 }
 
+// Skip next instruction if key with the value of Vx is pressed
 func opEX9E(vm *chip8, X uint8) {
 	if vm.keyboard[vm.v[X]] {
 		vm.pc += 2
 	}
 }
 
+// Skip next instruction if key with the value of Vx is not pressed
 func opEXA1(vm *chip8, X uint8) {
 	if !vm.keyboard[vm.v[X]] {
 		vm.pc += 2
@@ -372,7 +392,7 @@ func opEXA1(vm *chip8, X uint8) {
 
 // Set Vx = delay timer
 func opFX07(vm *chip8, X uint8) {
-	vm.v[X] = byte(vm.delayTimer.Load())
+	vm.v[X] = vm.delayTimer
 }
 
 // Wait for key press and store it in Vx
@@ -389,12 +409,12 @@ func opFX0A(vm *chip8, X uint8) {
 
 // Set delay timer to Vx
 func opFX15(vm *chip8, X uint8) {
-	vm.delayTimer.Store(uint32(vm.v[X]))
+	vm.delayTimer = vm.v[X]
 }
 
 // Set sound timer to Vx
 func opFX18(vm *chip8, X uint8) {
-	vm.soundTimer.Store(uint32(vm.v[X]))
+	vm.soundTimer = vm.v[X]
 }
 
 // Increment I by Vx

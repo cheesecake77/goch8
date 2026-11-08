@@ -1,7 +1,6 @@
 package main
 
 import (
-	//	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -25,7 +24,13 @@ func DeinitDisplay() {
 }
 
 func DrawIntro() {
-	rl.DrawText("Drag&Drop .c8 or .ch8 ROM here!", 130, 120, 20, rl.RayWhite)
+	fontSize := cellSize * 2
+	text := "Drag&Drop .c8 or .ch8 ROM here!"
+	textWidth := rl.MeasureText(text, int32(fontSize))
+
+	y := cellSize*16 - fontSize / 2
+	x := (cellSize*64 - textWidth) / 2
+	rl.DrawText(text, int32(x), int32(y), int32(fontSize), rl.RayWhite)
 }
 
 func UpdateDisplay(display *[32]uint64) {
@@ -48,13 +53,10 @@ func UpdateDisplay(display *[32]uint64) {
 }
 
 func UpdateKeyboard(vm *chip8) {
-	if vm.keypadMU.TryLock() {
 		for key, chip8Key := range keyMap {
 			vm.keyboard[chip8Key] = rl.IsKeyDown(key)
 		}
-		vm.keypadMU.Unlock()
 	}
-}
 
 var keyMap = map[int32]uint8{
 	rl.KeyOne:   0x1,
